@@ -1,0 +1,126 @@
+<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Company Management System</title><style>
+:root{--bg:#0a0f1e;--c:#121a30;--b:#222c4a;--t:#e8ecf8;--m:#8d98b8;--a:#4f7cff;--p:#8b5cf6;--r:#ef4444;--g:#22c55e}
+*{box-sizing:border-box;margin:0}body{font:14px 'Segoe UI',Tahoma,sans-serif;background:var(--bg);color:var(--t)}
+button,input,select,textarea{font:inherit;color:inherit}
+input,select,textarea{width:100%;background:#0d1426;border:1px solid var(--b);border-radius:10px;padding:10px;margin:4px 0 10px}
+.btn{background:linear-gradient(135deg,var(--a),var(--p));border:0;border-radius:10px;padding:9px 14px;cursor:pointer;color:#fff;transition:.2s}.btn:hover{opacity:.85}
+.btn.s{background:var(--b)}.btn.d{background:var(--r)}.btn.sm{padding:5px 9px;font-size:12px;margin:2px}
+.card{background:var(--c);border:1px solid var(--b);border-radius:14px;padding:16px;animation:in .3s}
+@keyframes in{from{opacity:0;transform:translateY(8px)}}
+#app{display:flex;min-height:100vh}
+aside{width:230px;background:var(--c);border-inline-end:1px solid var(--b);padding:12px;position:sticky;top:0;height:100vh;overflow:auto}
+aside a{display:block;padding:10px;border-radius:10px;cursor:pointer;color:var(--m)}aside a:hover,aside a.on{background:#1b2547;color:#fff}
+main{flex:1;padding:16px;min-width:0}.top{display:flex;align-items:center;gap:10px;margin-bottom:14px}.top h2{flex:1}#mb{display:none}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}
+.big{font-size:28px;font-weight:700;background:linear-gradient(135deg,var(--a),var(--p));-webkit-background-clip:text;color:transparent}
+.tw{overflow:auto}table{width:100%;border-collapse:collapse}th,td{padding:9px;text-align:start;border-bottom:1px solid var(--b);white-space:nowrap}th{color:var(--m);cursor:pointer}
+.bd{padding:2px 8px;border-radius:20px;background:#1b2547;font-size:12px}.ok{color:var(--g)}.no{color:var(--r)}
+.ov{position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;padding:12px;z-index:9}
+.md{background:var(--c);border:1px solid var(--b);border-radius:14px;padding:18px;width:100%;max-width:480px;max-height:92vh;overflow:auto}
+#ts{position:fixed;bottom:14px;left:14px;z-index:99}.to{background:var(--c);border:1px solid var(--a);padding:10px 14px;border-radius:10px;margin-top:6px;animation:in .3s}
+.lg{max-width:360px;margin:8vh auto;text-align:center}.pw{display:flex;gap:6px;align-items:center}
+.con{font-family:monospace;direction:ltr;text-align:left;background:#05080f;border-radius:10px;padding:12px;color:#7dd3fc;margin-bottom:6px;line-height:1.7}
+.bar{height:10px;border-radius:5px;background:linear-gradient(90deg,var(--a),var(--p));margin:4px 0}
+@media(max-width:760px){aside{position:fixed;inset:0 0 0 auto;z-index:8;transform:translateX(110%);transition:.25s}aside.o{transform:none}#mb{display:block}}
+@media print{aside,.top,.nop{display:none}}
+</style></head><body><div id="ts"></div><div id="root"></div><script>
+const $=s=>document.querySelector(s),K='cms_db',VER='1.0.0',DEV='محمد إبراهيم';
+const PERMS={view_dashboard:'عرض الرئيسية',manage_users:'إدارة المستخدمين',add_users:'إضافة مستخدمين',edit_users:'تعديل مستخدمين',delete_users:'حذف مستخدمين',manage_tables:'إدارة الجداول',create_tables:'إنشاء جداول',delete_tables:'حذف جداول',vip:'دخول VIP',developer:'دخول المطور',reports:'التقارير',settings:'الإعدادات'};
+const ROLES={admin:'مدير النظام',manager:'مدير',vip:'VIP',user:'مستخدم'};
+const DEF={admin:Object.keys(PERMS),manager:['view_dashboard','manage_users','add_users','edit_users','manage_tables','create_tables','reports','settings'],vip:['view_dashboard','vip','settings'],user:['view_dashboard']};
+const NAV=[['home','🏠','الرئيسية','view_dashboard'],['users','👥','المستخدمون','manage_users'],['co','🏢','إدارة الشركة','manage_tables'],['tables','📊','الجداول','manage_tables'],['vip','⭐','VIP','vip'],['rep','📋','التقارير','reports'],['ann','🔔','الإعلانات','manage_tables'],['logs','📝','سجل العمليات','manage_users'],['set','⚙️','الإعدادات','settings'],['dev','👨‍💻','المطور','developer']];
+const TPL={emp:['الموظفين',['الاسم','الوظيفة','الراتب:number','رقم الهاتف','الحالة:status']],dep:['الأقسام',['القسم','المدير','عدد الموظفين:number']],task:['المهام',['المهمة','المسؤول','الموعد:date','الحالة:status']],ann:['الإعلانات',['العنوان','النص:notes','التاريخ:date']],note:['الملاحظات',['العنوان','الملاحظة:notes']]};
+const TY={text:'نص',number:'رقم',date:'تاريخ',time:'وقت',select:'اختيار',status:'حالة',notes:'ملاحظات'};
+let db=JSON.parse(localStorage.getItem(K)||'null')||{users:[],tables:[],logs:[],set:{co:'اسم الشركة'}},me=null,view='home',st={};
+const save=()=>localStorage.setItem(K,JSON.stringify(db)),uid=()=>Math.random().toString(36).slice(2,9);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
+const can=p=>me&&(me.role==='admin'||me.perms.includes(p));
+const log=a=>{db.logs.unshift({u:me?me.username:'-',a,t:Date.now()});db.logs=db.logs.slice(0,500);save()};
+const v=(o,n)=>o.querySelector('[name="'+n+'"]').value.trim();
+async function hash(p,salt){if(!crypto.subtle){let h=0;for(const c of salt+p)h=(h*31+c.charCodeAt(0))>>>0;return''+h}
+const k=await crypto.subtle.importKey('raw',new TextEncoder().encode(p),'PBKDF2',false,['deriveBits']);
+const b=await crypto.subtle.deriveBits({name:'PBKDF2',salt:new TextEncoder().encode(salt),iterations:100000,hash:'SHA-256'},k,256);
+return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+function toast(m,e){const d=document.createElement('div');d.className='to';if(e)d.style.borderColor='var(--r)';d.textContent=m;$('#ts').append(d);setTimeout(()=>d.remove(),3000)}
+function modal(t,body,ok,label='حفظ'){const o=document.createElement('div');o.className='ov';o.innerHTML=`<div class="md"><h3>${t}</h3><br>${body}<div style="margin-top:10px;text-align:end"><button class="btn s" id="mx">إلغاء</button> ${ok?`<button class="btn" id="mo">${label}</button>`:''}</div></div>`;document.body.append(o);const x=()=>o.remove();o.querySelector('#mx').onclick=x;if(ok)o.querySelector('#mo').onclick=async()=>{if(await ok(o)!==false)x()};return o}
+const ask=(m,f)=>modal('تأكيد',`<p>${m}</p>`,f,'تأكيد');
+function auth(){const first=!db.users.length;$('#root').innerHTML=`<div class="card lg"><div style="font-size:46px">🏢</div><h2>${esc(db.set.co)}</h2><p style="color:var(--m)">نظام إدارة الشركة</p><br><form id="f" style="text-align:start">${first?'<p class="ok">الإعداد الأول: أنشئ حساب مدير النظام</p><br><label>الاسم</label><input name="n" required>':''}<label>اسم المستخدم</label><input name="u" required autocomplete="username"><label>كلمة المرور</label><div class="pw"><input name="p" type="password" required minlength="6"><button type="button" class="btn s" id="eye">👁</button></div><button class="btn" style="width:100%">${first?'إنشاء الحساب':'تسجيل الدخول'}</button></form><br><small style="color:var(--m)">المطور: ${DEV}</small></div>`;
+$('#eye').onclick=()=>{const i=$('[name=p]');i.type=i.type=='password'?'text':'password'};
+$('#f').onsubmit=async e=>{e.preventDefault();const u=$('[name=u]').value.trim().toLowerCase(),p=$('[name=p]').value;
+if(first){const s=uid();db.users.push({id:uid(),name:$('[name=n]').value,username:u,phone:'',dept:'الإدارة',role:'admin',active:1,perms:[...DEF.admin],salt:s,hash:await hash(p,s),created:Date.now()});me=db.users[0];log('إنشاء حساب المدير')}
+else{const x=db.users.find(y=>y.username===u);if(!x||!x.active||x.hash!==await hash(p,x.salt))return toast('بيانات الدخول غير صحيحة أو الحساب معطل',1);me=x;log('تسجيل الدخول')}
+sessionStorage.s=me.id;shell()}}
+function shell(){const items=NAV.filter(n=>can(n[3]));if(!items.find(n=>n[0]==view))view=items.length?items[0][0]:'none';
+$('#root').innerHTML=`<div id="app"><aside id="sb"><h3 style="padding:8px">🏢 ${esc(db.set.co)}</h3>${items.map(n=>`<a data-v="${n[0]}" class="${n[0]==view?'on':''}">${n[1]} ${n[2]}</a>`).join('')}<a id="out">🚪 تسجيل الخروج</a><small style="color:var(--m);padding:8px;display:block">المطور: ${DEV}</small></aside><main><div class="top"><button class="btn s" id="mb">☰</button><h2 id="ti"></h2><span class="bd">👤 ${esc(me.name)} · ${ROLES[me.role]}</span></div><div id="v"></div></main></div>`;
+$('#mb').onclick=()=>$('#sb').classList.toggle('o');
+document.querySelectorAll('[data-v]').forEach(a=>a.onclick=()=>{view=a.dataset.v;st={};shell()});
+$('#out').onclick=()=>{log('تسجيل الخروج');me=null;delete sessionStorage.s;auth()};
+const it=NAV.find(n=>n[0]==view);$('#ti').textContent=it?it[2]:'';(V[view]||(()=>{$('#v').innerHTML='<div class="card">🔒 لا توجد صلاحيات لحسابك</div>'}))()}
+const V={},card=(l,n)=>`<div class="card"><div style="color:var(--m)">${l}</div><div class="big">${n}</div></div>`;
+V.home=()=>{const U=db.users,T=db.tables,by=r=>U.filter(u=>u.role==r).length;
+$('#v').innerHTML=`<div class="grid">${card('المستخدمون',U.length)+card('النشطون',U.filter(u=>u.active).length)+card('جداول الشركة',T.filter(t=>!t.vip).length)+card('جداول VIP',T.filter(t=>t.vip).length)}</div><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))"><div class="card"><h4>المستخدمون حسب الدور</h4>${Object.keys(ROLES).map(r=>`<p>${ROLES[r]} (${by(r)})</p><div class="bar" style="width:${U.length?by(r)/U.length*100:0}%"></div>`).join('')}</div><div class="card"><h4>آخر المستخدمين</h4>${U.slice(-5).reverse().map(u=>`<p>${esc(u.name)} <span class="bd">${ROLES[u.role]}</span></p>`).join('')}</div><div class="card"><h4>آخر العمليات</h4>${db.logs.slice(0,5).map(l=>`<p>${esc(l.u)}: ${esc(l.a)}</p>`).join('')||'<p>لا توجد عمليات</p>'}</div></div>`};
+V.users=()=>{$('#v').innerHTML=`<div class="card"><div class="nop" style="margin-bottom:10px">${can('add_users')?'<button class="btn" id="add">+ مستخدم جديد</button>':''}</div><div class="tw"><table><tr><th>الاسم</th><th>Username</th><th>القسم</th><th>الدور</th><th>الحالة</th><th>تاريخ الإنشاء</th><th>الإجراءات</th></tr>${db.users.map(u=>`<tr><td>${esc(u.name)}</td><td>${esc(u.username)}</td><td>${esc(u.dept)}</td><td>${ROLES[u.role]}</td><td class="${u.active?'ok':'no'}">${u.active?'نشط':'معطل'}</td><td>${new Date(u.created).toLocaleDateString('ar-EG')}</td><td>${can('edit_users')?`<button class="btn sm" data-a="e" data-i="${u.id}">تعديل</button><button class="btn sm s" data-a="t" data-i="${u.id}">${u.active?'تعطيل':'تفعيل'}</button><button class="btn sm s" data-a="p" data-i="${u.id}">كلمة المرور</button>`:''}${can('delete_users')?`<button class="btn sm d" data-a="x" data-i="${u.id}">حذف</button>`:''}</td></tr>`).join('')}</table></div></div>`;
+if($('#add'))$('#add').onclick=()=>uForm();
+document.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{const u=db.users.find(x=>x.id==b.dataset.i),a=b.dataset.a;
+if(u.role=='admin'&&me.role!='admin')return toast('غير مسموح',1);
+if(a=='e')uForm(u);
+if(a=='p')modal('كلمة مرور جديدة: '+esc(u.name),'<input name="p" type="password">',async o=>{const p=v(o,'p');if(p.length<6){toast('6 أحرف على الأقل',1);return false}u.salt=uid();u.hash=await hash(p,u.salt);save();log('تغيير كلمة مرور '+u.username);toast('تم التغيير')});
+if(a=='t'){if(u.id==me.id)return toast('لا يمكنك تعطيل نفسك',1);u.active=u.active?0:1;save();log((u.active?'تفعيل ':'تعطيل ')+u.username);V.users()}
+if(a=='x'){if(u.id==me.id)return toast('لا يمكنك حذف نفسك',1);ask('حذف المستخدم '+esc(u.name)+'؟',()=>{db.users=db.users.filter(x=>x!=u);save();log('حذف مستخدم '+u.username);V.users();toast('تم الحذف')})}})};
+function uForm(u){const n=!u,o=modal(n?'مستخدم جديد':'تعديل مستخدم',`<label>الاسم</label><input name="n" value="${esc(u?.name)}"><label>Username</label><input name="u" value="${esc(u?.username)}" ${n?'':'disabled'}>${n?'<label>كلمة المرور</label><input name="p" type="password">':''}<label>الهاتف</label><input name="ph" value="${esc(u?.phone)}"><label>القسم</label><input name="d" value="${esc(u?.dept)}"><label>الدور</label><select name="r">${Object.keys(ROLES).filter(r=>me.role=='admin'||r!='admin').map(r=>`<option value="${r}" ${u?.role==r?'selected':''}>${ROLES[r]}</option>`).join('')}</select>${me.role=='admin'?`<label>الصلاحيات</label>${Object.keys(PERMS).map(k=>`<label style="display:block"><input type="checkbox" style="width:auto;margin:0 0 0 6px" value="${k}" ${(u?u.perms:DEF.user).includes(k)?'checked':''}>${PERMS[k]}</label>`).join('')}`:''}`,async o=>{
+const un=v(o,'u').toLowerCase(),nm=v(o,'n'),r=v(o,'r');
+if(!nm||!un){toast('الاسم واسم المستخدم مطلوبان',1);return false}
+if(n&&v(o,'p').length<6){toast('كلمة المرور 6 أحرف على الأقل',1);return false}
+if(n&&db.users.some(x=>x.username==un)){toast('اسم المستخدم موجود',1);return false}
+const ps=me.role=='admin'?[...o.querySelectorAll('[type=checkbox]')].filter(c=>c.checked).map(c=>c.value):(u?u.perms:DEF[r]);
+if(n){const s=uid();u={id:uid(),username:un,salt:s,hash:await hash(v(o,'p'),s),active:1,created:Date.now(),perms:[]};db.users.push(u)}
+if(!n&&ps.join()!=u.perms.join())log('تغيير صلاحيات '+un);
+Object.assign(u,{name:nm,phone:v(o,'ph'),dept:v(o,'d'),role:r,perms:ps});save();log((n?'إنشاء مستخدم ':'تعديل مستخدم ')+un);toast('تم الحفظ');shell()});
+o.querySelector('[name=r]').onchange=e=>o.querySelectorAll('[type=checkbox]').forEach(c=>c.checked=DEF[e.target.value].includes(c.value))}
+function tablesView(vip){const cur=db.tables.find(t=>t.id==st.t&&!!t.vip==vip);if(cur)return rowsView(cur,vip);
+const L=db.tables.filter(t=>!!t.vip==vip),C=vip?can('vip'):can('create_tables'),D=vip?can('vip'):can('delete_tables');
+$('#v').innerHTML=`<div class="nop" style="margin-bottom:10px">${C?`<button class="btn" id="nt">${vip?'+ إضافة جدول VIP':'+ جدول جديد'}</button>`:''}</div><div class="grid">${L.map(t=>`<div class="card"><h4>${esc(t.name)}</h4><p style="color:var(--m)">${esc(t.desc)}</p><p>${t.rows.length} صف · ${t.cols.length} عمود</p><button class="btn sm" data-o="${t.id}">فتح</button>${C?`<button class="btn sm s" data-e="${t.id}">تعديل</button>`:''}${D?`<button class="btn sm d" data-x="${t.id}">حذف</button>`:''}</div>`).join('')||'<div class="card">📭 لا توجد جداول بعد</div>'}</div>`;
+if($('#nt'))$('#nt').onclick=()=>tForm(null,vip);
+document.querySelectorAll('[data-o]').forEach(b=>b.onclick=()=>{st={t:b.dataset.o,q:'',c:'',s:'',d:1,p:0};V[view]()});
+document.querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>tForm(db.tables.find(t=>t.id==b.dataset.e),vip));
+document.querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{const t=db.tables.find(x=>x.id==b.dataset.x);ask('حذف الجدول '+esc(t.name)+' وكل بياناته؟',()=>{db.tables=db.tables.filter(x=>x!=t);save();log('حذف جدول '+t.name);V[view]();toast('تم الحذف')})})}
+V.tables=()=>tablesView(0);V.vip=()=>tablesView(1);
+function tForm(t,vip){const cols=t?t.cols.map(c=>({...c})):[{id:uid(),n:'',t:'text'}];
+const draw=()=>cl.innerHTML=cols.map((c,i)=>`<div style="display:flex;gap:4px"><input placeholder="اسم العمود" value="${esc(c.n)}" data-i="${i}" data-k="n"><select data-i="${i}" data-k="t">${Object.keys(TY).map(k=>`<option value="${k}" ${c.t==k?'selected':''}>${TY[k]}</option>`).join('')}</select><button type="button" class="btn sm d" data-r="${i}">✕</button></div>${c.t=='select'?`<input placeholder="الخيارات مفصولة بفاصلة" value="${esc(c.o)}" data-i="${i}" data-k="o">`:''}`).join('');
+const o=modal(t?'تعديل جدول':'جدول جديد',`<label>اسم الجدول</label><input name="n" value="${esc(t?.name)}"><label>الوصف</label><input name="d" value="${esc(t?.desc)}"><label>الأعمدة</label><div id="cl"></div><button type="button" class="btn sm s" id="ac">+ عمود</button>`,o=>{
+const nm=v(o,'n');if(!nm||cols.some(c=>!c.n.trim())){toast('أكمل اسم الجدول وأسماء الأعمدة',1);return false}
+if(t){Object.assign(t,{name:nm,desc:v(o,'d'),cols});log('تعديل جدول '+nm)}else{db.tables.push({id:uid(),name:nm,desc:v(o,'d'),vip:vip?1:0,cols,rows:[]});log('إنشاء جدول '+nm)}
+save();toast('تم الحفظ');V[view]()}),cl=o.querySelector('#cl');
+cl.oninput=e=>{const d=e.target.dataset;if(d.k){cols[d.i][d.k]=e.target.value;if(d.k=='t')draw()}};
+cl.onclick=e=>{const r=e.target.dataset.r;if(r!=null&&cols.length>1){cols.splice(r,1);draw()}};
+o.querySelector('#ac').onclick=()=>{cols.push({id:uid(),n:'',t:'text'});draw()};draw()}
+function rowsView(t,vip){const E=vip?can('vip'):can('manage_tables'),re=()=>rowsView(t,vip),s=st.q.toLowerCase();
+const R=t.rows.filter(r=>!s||(st.c?[r.v[st.c]]:Object.values(r.v)).some(x=>String(x??'').toLowerCase().includes(s)));
+if(st.s)R.sort((a,b)=>{const x=a.v[st.s]??'',y=b.v[st.s]??'';return(isNaN(x)||isNaN(y)||x===''||y===''?String(x).localeCompare(String(y),'ar'):x-y)*st.d});
+const pg=Math.max(1,Math.ceil(R.length/10));st.p=Math.min(st.p,pg-1);
+$('#v').innerHTML=`<div class="card"><div class="nop" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center"><button class="btn s" id="bk">→ رجوع</button><b style="flex:1">${esc(t.name)}</b><input id="q" placeholder="بحث..." value="${esc(st.q)}" style="flex:1;margin:0;min-width:120px"><select id="qc" style="width:auto;margin:0"><option value="">كل الأعمدة</option>${t.cols.map(c=>`<option value="${c.id}" ${st.c==c.id?'selected':''}>${esc(c.n)}</option>`).join('')}</select>${E?'<button class="btn" id="ar">+ صف</button>':''}<button class="btn s" id="csv">CSV</button><button class="btn s" id="pr">🖨</button></div><div class="tw"><table><tr>${t.cols.map(c=>`<th data-s="${c.id}">${esc(c.n)}${st.s==c.id?(st.d>0?' ▲':' ▼'):''}</th>`).join('')}${E?'<th class="nop"></th>':''}</tr>${R.slice(st.p*10,st.p*10+10).map(r=>`<tr>${t.cols.map(c=>`<td>${esc(r.v[c.id])}</td>`).join('')}${E?`<td class="nop"><button class="btn sm" data-re="${r.id}">✎</button><button class="btn sm d" data-rx="${r.id}">🗑</button></td>`:''}</tr>`).join('')||'<tr><td colspan="9">📭 لا توجد بيانات</td></tr>'}</table></div><div class="nop" style="margin-top:10px;text-align:center"><button class="btn sm s" id="pv">السابق</button> ${st.p+1} / ${pg} <button class="btn sm s" id="nx">التالي</button></div></div>`;
+$('#bk').onclick=()=>{st={};V[view]()};
+$('#q').onchange=e=>{st.q=e.target.value;st.p=0;re()};$('#qc').onchange=e=>{st.c=e.target.value;re()};
+document.querySelectorAll('[data-s]').forEach(h=>h.onclick=()=>{st.d=st.s==h.dataset.s?-st.d:1;st.s=h.dataset.s;re()});
+$('#pv').onclick=()=>{st.p=Math.max(0,st.p-1);re()};$('#nx').onclick=()=>{st.p=Math.min(pg-1,st.p+1);re()};$('#pr').onclick=()=>print();
+$('#csv').onclick=()=>{const q=x=>'"'+String(x??'').replace(/"/g,'""')+'"',d='\ufeff'+[t.cols.map(c=>q(c.n)),...R.map(r=>t.cols.map(c=>q(r.v[c.id])))].map(a=>a.join(',')).join('\n'),a=document.createElement('a');a.href=URL.createObjectURL(new Blob([d],{type:'text/csv'}));a.download=t.name+'.csv';a.click();log('تصدير '+t.name)};
+if($('#ar'))$('#ar').onclick=()=>rForm(t,null,re);
+document.querySelectorAll('[data-re]').forEach(b=>b.onclick=()=>rForm(t,t.rows.find(r=>r.id==b.dataset.re),re));
+document.querySelectorAll('[data-rx]').forEach(b=>b.onclick=()=>ask('حذف الصف؟',()=>{t.rows=t.rows.filter(r=>r.id!=b.dataset.rx);save();log('حذف بيانات من '+t.name);re()}))}
+function rForm(t,r,re){const inp=c=>{const x=r?.v[c.id]??'',nm=`name="${c.id}"`;
+if(c.t=='notes')return`<textarea ${nm}>${esc(x)}</textarea>`;
+if(c.t=='select'||c.t=='status'){const op=c.t=='status'?['نشط','معلق','مكتمل']:(c.o||'').split(/[,،]/).map(s=>s.trim()).filter(Boolean);return`<select ${nm}><option></option>${op.map(p=>`<option ${p==x?'selected':''}>${esc(p)}</option>`).join('')}</select>`}
+return`<input ${nm} type="${{number:'number',date:'date',time:'time'}[c.t]||'text'}" value="${esc(x)}">`};
+modal(r?'تعديل صف':'صف جديد',t.cols.map(c=>`<label>${esc(c.n)}</label>${inp(c)}`).join(''),o=>{const val={};t.cols.forEach(c=>val[c.id]=v(o,c.id));if(r)r.v=val;else t.rows.push({id:uid(),v:val});save();log((r?'تعديل':'إضافة')+' بيانات في '+t.name);toast('تم الحفظ');re()})}
+function openT(k){let t=db.tables.find(x=>x.k==k);if(!t){const[n,cs]=TPL[k];t={id:uid(),k,name:n,desc:'قسم من إدارة الشركة',vip:0,cols:cs.map(s=>{const[a,b]=s.split(':');return{id:uid(),n:a,t:b||'text'}}),rows:[]};db.tables.push(t);save();log('إنشاء جدول '+n)}view='tables';st={t:t.id,q:'',c:'',s:'',d:1,p:0};shell()}
+V.ann=()=>openT('ann');
+V.co=()=>{$('#v').innerHTML=`<div class="grid">${Object.keys(TPL).map(k=>`<div class="card" style="cursor:pointer" data-k="${k}"><div style="font-size:30px">${{emp:'👥',dep:'🏛',task:'✅',ann:'🔔',note:'📝'}[k]}</div><h4>${TPL[k][0]}</h4></div>`).join('')}<div class="card" style="cursor:pointer" data-k="tables"><div style="font-size:30px">📊</div><h4>الجداول</h4></div><div class="card" style="cursor:pointer" data-k="rep"><div style="font-size:30px">📋</div><h4>التقارير</h4></div></div>`;
+document.querySelectorAll('[data-k]').forEach(c=>c.onclick=()=>{const k=c.dataset.k;if(TPL[k])openT(k);else{view=k;st={};shell()}})};
+V.rep=()=>{$('#v').innerHTML=`<div class="card"><button class="btn s nop" onclick="print()">🖨 طباعة</button><div class="tw"><table><tr><th>الجدول</th><th>النوع</th><th>الأعمدة</th><th>الصفوف</th></tr>${db.tables.filter(t=>!t.vip||can('vip')).map(t=>`<tr><td>${esc(t.name)}</td><td>${t.vip?'VIP':'شركة'}</td><td>${t.cols.length}</td><td>${t.rows.length}</td></tr>`).join('')}</table></div></div>`};
+V.logs=()=>{$('#v').innerHTML=`<div class="card tw"><table><tr><th>المستخدم</th><th>العملية</th><th>التاريخ</th><th>الوقت</th></tr>${db.logs.slice(0,100).map(l=>{const d=new Date(l.t);return`<tr><td>${esc(l.u)}</td><td>${esc(l.a)}</td><td>${d.toLocaleDateString('ar-EG')}</td><td>${d.toLocaleTimeString('ar-EG')}</td></tr>`}).join('')}</table></div>`};
+V.set=()=>{$('#v').innerHTML=`<div class="card" style="max-width:420px"><h4>الملف الشخصي: ${esc(me.name)}</h4><br><label>اسم الشركة</label><input id="co" value="${esc(db.set.co)}" ${me.role=='admin'?'':'disabled'}><button class="btn" id="sc">حفظ الاسم</button><hr style="margin:14px 0;border-color:var(--b)"><label>كلمة المرور الجديدة</label><input id="np" type="password"><button class="btn" id="sp">تغيير كلمة المرور</button></div>`;
+$('#sc').onclick=()=>{if(me.role!='admin')return toast('للمدير فقط',1);db.set.co=$('#co').value||db.set.co;save();log('تعديل الإعدادات');shell()};
+$('#sp').onclick=async()=>{const p=$('#np').value;if(p.length<6)return toast('6 أحرف على الأقل',1);me.salt=uid();me.hash=await hash(p,me.salt);save();log('تغيير كلمة المرور');toast('تم التغيير')}};
+V.dev=()=>{$('#v').innerHTML=`<div class="card"><h3 class="big" style="font-size:22px">المطور ${DEV}</h3><p style="color:var(--m)">Developer Console · للقراءة فقط</p><br><div class="con">App: Company Management System<br>Version: ${VER}<br>Status: <span class="ok">ONLINE</span><br>Users: ${db.users.length}<br>Tables: ${db.tables.length}<br>Logs: ${db.logs.length}<br>Storage: localStorage ${(JSON.stringify(db).length/1024).toFixed(1)} KB<br>Stack: HTML5 · CSS3 · JavaScript<br>Hash: PBKDF2-SHA256 100k</div></div><br><div class="card"><h4>About Developer</h4><p>تم تطوير هذا النظام بواسطة ${DEV}.</p></div><br><div class="card"><h4>سجل العمليات</h4>${db.logs.slice(0,10).map(l=>`<div class="con">${esc(l.u)} | ${esc(l.a)} | ${new Date(l.t).toLocaleString('en-GB')}</div>`).join('')}</div>`};
+me=db.users.find(u=>u.id==sessionStorage.s&&u.active)||null;me?shell():auth();
+</script></body></html>
